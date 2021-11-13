@@ -1,4 +1,4 @@
 hole: 50
 adjacent_hole: 10
-bridge: 1000000
-well: 100000000
+bridge: 10000
+well: 1000

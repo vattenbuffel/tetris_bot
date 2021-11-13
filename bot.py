@@ -1,3 +1,4 @@
+from numpy.core.shape_base import block
 import yaml
 import numpy as np
 import player as Player
@@ -133,28 +134,27 @@ def eval_board(board, player, depth, verbose=False):
             bridge_cost -= np.sum(holes) * weights['bridge']
     cost += bridge_cost
 
+    # well cost. If two adjacent cols have a height difference of more than 4, add a cost
+    well_cost = 0
+    bottom_top = 0
+    highest_top = Board.height-1
+    for col in player_board.transpose():
+        block_idx, = np.where(col)
+        if np.any(block_idx):
+            highest_top = np.minimum(highest_top, block_idx[0])
+            bottom_top = np.maximum(bottom_top, block_idx[0])
+        else:
+            bottom_top = 20
+    too_high = np.maximum(4, bottom_top - highest_top) - 4 
+    well_cost = -too_high**2 * weights['well']
+    cost += well_cost
 
-    # well cost
-    # well_cost = 0
-    # y_player_max = np.max(player[:,1]) 
-    # y_board_max = 0 
-    # for y in range(Board.height, 0, -1):
-    #     if np.any(player_board[y,:]):
-    #         y_board_max = y
-    #         break
-    # well_depth = y_board_max - y_player_max
-            
-
-
-
-
-        
 
     # height = Board.height - np.min(np.where(np.any(player_board, axis=1)))
     # return height - depth
 
     if verbose:
-        print(f"hole_cost: {hole_cost}, adjacent_hole_cost: {adjacent_hole_cost}, bridge_cost: {bridge_cost}")
+        print(f"hole_cost: {hole_cost}, adjacent_hole_cost: {adjacent_hole_cost}, bridge_cost: {bridge_cost}, well_cost: {well_cost}")
 
     cost -= depth
     return cost
