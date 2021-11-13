@@ -12,13 +12,24 @@ class GameState:
         self.children = []
         self.value = -(10**100)
 
-    def next_best_state(self):
-        # returns the next best state
+    def best_child(self, end_child=False):
+        # returns the next best state. If end_child it will go through all childs and grand children etc to find the best end state. If false then it will find the best child
+        # If no children, return this
+
+        if self.children == []:
+            return self
+
         best_val = self.get_value()
 
+        best_child = None
         for child in self.children:
             if child.value == best_val:
-                return child
+                best_child = child
+                break
+        
+        if end_child:
+            return best_child.best_child(end_child=True)
+        return best_child
         
         raise Exception("Should not be able to get here. One child should have best val")
 

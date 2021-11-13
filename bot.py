@@ -15,12 +15,14 @@ with open("bot_weights.yaml", 'r') as stream:
 
 def action_get(player, board) -> Actions:
     base_state = GameState(board, player, Actions.NONE, 0, None)
-    build_start_t = time.perf_counter_ns()
+    # build_start_t = time.perf_counter_ns()
     states_n = build_state_tree(base_state, prev_player_dict={})
-    best_state_t = time.perf_counter_ns()
-    goal_state:GameState = base_state.next_best_state()
+    # best_state_t = time.perf_counter_ns()
+    goal_state:GameState = base_state.best_child(end_child=False)
+    best_state = base_state.best_child(end_child=True)
+    eval_board(best_state.board, best_state.player, 0, verbose=True)    
     # print(f"It took: {(best_state_t - build_start_t)/1000000} ms to build tree. It took {(time.perf_counter_ns() - best_state_t)/1000000} ms to find best action" )
-    actions = goal_state.children_actions_get()
+    # actions = goal_state.children_actions_get()
     # global times
     # times = {key:0 for key in times}
     return goal_state.action, states_n
@@ -78,7 +80,7 @@ def build_state_tree(parent:GameState, states_n=0, depth=0, prev_player_dict={})
     return states_n
         
 
-def eval_board(board, player, depth):
+def eval_board(board, player, depth, verbose=False):
     # Depth is how many actions it took to get here
 
     player_board = Player.add_to_board(player, Colors.blue, board)
@@ -124,11 +126,11 @@ def eval_board(board, player, depth):
 
     # Calculate bridge cost
     bridge_cost = 0
-    y_max = 0
-    for x, y in player:
-        # Bridge
-        holes = player_board[y:, x] == 0
-        bridge_cost -= np.sum(holes) * weights['bridge']
+    for col in (player_board.transpose() > 0):
+        block_idx, = np.where(col)
+        if np.any(block_idx):
+            holes = col[block_idx[0] + 1:] == 0
+            bridge_cost -= np.sum(holes) * weights['bridge']
     cost += bridge_cost
 
 
@@ -151,6 +153,8 @@ def eval_board(board, player, depth):
     # height = Board.height - np.min(np.where(np.any(player_board, axis=1)))
     # return height - depth
 
+    if verbose:
+        print(f"hole_cost: {hole_cost}, adjacent_hole_cost: {adjacent_hole_cost}, bridge_cost: {bridge_cost}")
 
     cost -= depth
     return cost

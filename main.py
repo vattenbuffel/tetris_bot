@@ -40,12 +40,9 @@ prev_t = time.perf_counter()
 while True:
     Display.update(player, player_color, board)
     actions = get_human_actions()
-    # actions = []
     if bot_playing and time.perf_counter() - prev_t > 0.016:
         action_t = time.perf_counter_ns()
         action, states_n = Bot.action_get(player, board)
-        # assert states_n <= prev_states_n
-        print(f"Prev_states_n: {prev_states_n}, states_n: {states_n}")
         prev_states_n = states_n
         actions = [action]
         # print(f"It took: {(time.perf_counter_ns() - action_t)/1000000} ms to calculate bot action. It evaluated: {states_n} possible board states")
