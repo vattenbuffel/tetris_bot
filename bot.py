@@ -12,20 +12,20 @@ import time
 with open("bot_weights.yaml", 'r') as stream:
     weights = yaml.safe_load(stream)
 
-# times = {'action':0, "create_child":0, "hit_floor":0, "dict_math":0}
+times = {'action':0, "create_child":0, "hit_floor":0, "dict_math":0}
 
 def action_get(player, board) -> Actions:
     base_state = GameState(board, player, Actions.NONE, 0, None)
-    # build_start_t = time.perf_counter_ns()
     states_n = build_state_tree(base_state, prev_player_dict={})
-    # best_state_t = time.perf_counter_ns()
     goal_state:GameState = base_state.best_child(end_child=False)
-    best_state = base_state.best_child(end_child=True)
-    eval_board(best_state.board, best_state.player, 0, verbose=True)    
-    # print(f"It took: {(best_state_t - build_start_t)/1000000} ms to build tree. It took {(time.perf_counter_ns() - best_state_t)/1000000} ms to find best action" )
-    # actions = goal_state.children_actions_get()
-    # global times
-    # times = {key:0 for key in times}
+
+    # Print the costs 
+    # best_state = base_state.best_child(end_child=True)
+    # eval_board(best_state.board, best_state.player, 0, verbose=True)    
+
+    # For timing debugging
+    global times
+    times = {key:0 for key in times}
     return goal_state.action, states_n
 
 def build_state_tree(parent:GameState, states_n=0, depth=0, prev_player_dict={}):
@@ -39,7 +39,7 @@ def build_state_tree(parent:GameState, states_n=0, depth=0, prev_player_dict={})
             continue
 
         res = Game.perform_action(parent.player, parent.board, action)
-        # times["action"] += (time.perf_counter_ns() - start_t)/(1e6)
+        times["action"] += (time.perf_counter_ns() - start_t)/(1e6)
 
         # Player got to same state, ie hitting a wall or action was NONE for example
         if res is None and action != Actions.DOWN:
@@ -47,7 +47,7 @@ def build_state_tree(parent:GameState, states_n=0, depth=0, prev_player_dict={})
 
         start_t = time.perf_counter_ns()
         child:GameState = GameState(parent.board, parent.player, action, depth, parent)        
-        # times["create_child"] += (time.perf_counter_ns() - start_t)/(1e6)
+        times["create_child"] += (time.perf_counter_ns() - start_t)/(1e6)
         # Player collided with floor
         if res is None and action == Actions.DOWN:
             start_t = time.perf_counter_ns()
@@ -55,7 +55,7 @@ def build_state_tree(parent:GameState, states_n=0, depth=0, prev_player_dict={})
             child.value = eval_board(parent.board, parent.player, depth)
             parent.children.append(child)
             # print(f"Actions: {[action.name for action in child.actions_get()]}, value: {child.value}")
-            # times["hit_floor"] += (time.perf_counter_ns() - start_t)/(1e6)
+            times["hit_floor"] += (time.perf_counter_ns() - start_t)/(1e6)
             continue
         
         player = res
@@ -65,7 +65,7 @@ def build_state_tree(parent:GameState, states_n=0, depth=0, prev_player_dict={})
         if player_tuple in prev_player_dict and prev_player_dict[player_tuple] <= depth:
             continue
         prev_player_dict[player_tuple] = depth
-        # times["dict_math"] += (time.perf_counter_ns() - start_t)/(1e6)
+        times["dict_math"] += (time.perf_counter_ns() - start_t)/(1e6)
 
         # Valid movement. Update player's position
         child.player = player
@@ -134,11 +134,31 @@ def eval_board(board, player, depth, verbose=False):
             bridge_cost -= np.sum(holes) * weights['bridge']
     cost += bridge_cost
 
+    # calculate tetris cost. If placing pieces in the right-most column and not getting tetris, add cost
+    tetris_cost = 0
+    tetris_cost_enabled = True
+    filled_row_idx, = np.where(np.sum(player_board, axis=1)>0)
+    if filled_row_idx.size > 0:
+        tetris_cost_enabled = filled_row_idx[0] > weights['tetris_height_disable']
+
+    if tetris_cost_enabled:
+        xs = player[:,0]
+        if Board.width-1 in xs:
+            tetris_cost = -weights['tetris']
+
+            tetris_cost = 0 if np.all(xs == Board.width-1) else tetris_cost
+
+            destroyed_n, _ = Board.destroy(player_board.copy())
+            got_tetris = destroyed_n == 4
+            tetris_cost = 10**10 if got_tetris else tetris_cost 
+
+    cost += tetris_cost
+
     # well cost. If two adjacent cols have a height difference of more than 4, add a cost
     well_cost = 0
     bottom_top = 0
     highest_top = Board.height-1
-    for col in player_board.transpose():
+    for col in player_board.transpose()[:-1]:
         block_idx, = np.where(col)
         if np.any(block_idx):
             highest_top = np.minimum(highest_top, block_idx[0])
@@ -149,12 +169,11 @@ def eval_board(board, player, depth, verbose=False):
     well_cost = -too_high**2 * weights['well']
     cost += well_cost
 
-
     # height = Board.height - np.min(np.where(np.any(player_board, axis=1)))
     # return height - depth
 
     if verbose:
-        print(f"hole_cost: {hole_cost}, adjacent_hole_cost: {adjacent_hole_cost}, bridge_cost: {bridge_cost}, well_cost: {well_cost}")
+        print(f"hole_cost: {hole_cost}, adjacent_hole_cost: {adjacent_hole_cost}, bridge_cost: {bridge_cost}, well_cost: {well_cost}, tetris_cost: {tetris_cost}")
 
     cost -= depth
     return cost

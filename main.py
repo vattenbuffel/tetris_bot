@@ -45,7 +45,7 @@ while True:
         action, states_n = Bot.action_get(player, board)
         prev_states_n = states_n
         actions = [action]
-        # print(f"It took: {(time.perf_counter_ns() - action_t)/1000000} ms to calculate bot action. It evaluated: {states_n} possible board states")
+        print(f"It took: {(time.perf_counter_ns() - action_t)/1000000} ms to calculate bot action. It evaluated: {states_n} possible board states")
         prev_t = time.perf_counter()
 
     for action in actions:
