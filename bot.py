@@ -20,8 +20,8 @@ def action_get(player, board) -> Actions:
     goal_state:GameState = base_state.best_child(end_child=False)
 
     # Print the costs 
-    # best_state = base_state.best_child(end_child=True)
-    # eval_board(best_state.board, best_state.player, 0, verbose=True)    
+    best_state = base_state.best_child(end_child=True)
+    eval_board(best_state.board, best_state.player, 0, verbose=True)    
 
     # For timing debugging
     global times
@@ -137,9 +137,17 @@ def eval_board(board, player, depth, verbose=False):
     # calculate tetris cost. If placing pieces in the right-most column and not getting tetris, add cost
     tetris_cost = 0
     tetris_cost_enabled = True
+    # Disable tetris cost if tower is too high
     filled_row_idx, = np.where(np.sum(player_board, axis=1)>0)
     if filled_row_idx.size > 0:
-        tetris_cost_enabled = filled_row_idx[0] > weights['tetris_height_disable']
+        tetris_cost_enabled &= filled_row_idx[0] > weights['tetris_height_disable']
+    
+    # Disable tetris cost if bottom 4 rows have holes in them.     
+    bottom =  board[Board.height-5:Board.height, :].copy()
+    bottom[bottom>0] = 1
+    hole_difference = np.diff(bottom, axis=0)
+    hole_exists = np.any(hole_difference < 0)
+    tetris_cost_enabled &= not hole_exists
 
     if tetris_cost_enabled:
         xs = player[:,0]
@@ -158,7 +166,8 @@ def eval_board(board, player, depth, verbose=False):
     well_cost = 0
     bottom_top = 0
     highest_top = Board.height-1
-    for col in player_board.transpose()[:-1]:
+    board_to_loop_over = player_board.transpose()[:-1] if tetris_cost_enabled else player_board.transpose()
+    for col in board_to_loop_over:
         block_idx, = np.where(col)
         if np.any(block_idx):
             highest_top = np.minimum(highest_top, block_idx[0])
@@ -166,14 +175,14 @@ def eval_board(board, player, depth, verbose=False):
         else:
             bottom_top = 20
     too_high = np.maximum(4, bottom_top - highest_top) - 4 
-    well_cost = -too_high**3 * weights['well']
+    well_cost = -too_high**2 * weights['well']
     cost += well_cost
 
     # height = Board.height - np.min(np.where(np.any(player_board, axis=1)))
     # return height - depth
 
     if verbose:
-        print(f"hole_cost: {hole_cost}, adjacent_hole_cost: {adjacent_hole_cost}, bridge_cost: {bridge_cost}, well_cost: {well_cost}, tetris_cost: {tetris_cost}")
+        print(f"hole_cost: {hole_cost}, adjacent_hole_cost: {adjacent_hole_cost}, bridge_cost: {bridge_cost}, well_height: {too_high}, well_cost: {well_cost}, tetris_cost_enabled: {tetris_cost_enabled}, tetris_cost: {tetris_cost}")
 
     cost -= depth
     return cost

@@ -1,6 +1,6 @@
 hole: 0
-adjacent_hole: 10
-bridge: 3000
+adjacent_hole: 1
+bridge: 1000
 well: 100
 tetris: 100000
 tetris_height_disable: 7
