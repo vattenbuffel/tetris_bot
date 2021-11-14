@@ -166,7 +166,7 @@ def eval_board(board, player, depth, verbose=False):
         else:
             bottom_top = 20
     too_high = np.maximum(4, bottom_top - highest_top) - 4 
-    well_cost = -too_high**2 * weights['well']
+    well_cost = -too_high**3 * weights['well']
     cost += well_cost
 
     # height = Board.height - np.min(np.where(np.any(player_board, axis=1)))
